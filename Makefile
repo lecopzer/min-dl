@@ -1,9 +1,10 @@
-CFLAGS = -std=gnu99 -Wall -Werror -g -D_GNU_SOURCE
+CC      = $(CROSS_COMPILE)gcc
+CFLAGS  = -std=gnu99 -Wall -Werror -g -D_GNU_SOURCE
 CFLAGS += -DPROG_HEADER=prog_header
 
-OUT = out
+OUT     = out
+BIN     = $(OUT) $(OUT)/test_lib.so $(OUT)/loader
 
-BIN = $(OUT) $(OUT)/test_lib.so $(OUT)/loader
 all: $(BIN)
 
 $(OUT):
