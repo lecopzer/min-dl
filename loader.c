@@ -16,9 +16,13 @@
 
 #define MAX_PHNUM 12
 
+#if defined(__x86_64__)
 typedef ElfW(Rela) ElfW_Reloc;
-#define ELFW_R_TYPE(x) ELF64_R_TYPE(x)
-#define ELFW_R_SYM(x) ELF64_R_SYM(x)
+#else
+typedef ElfW(Rel) ElfW_Reloc;
+#endif
+#define ELFW_R_TYPE(x) ELFW(R_TYPE)(x)
+#define ELFW_R_SYM(x) ELFW(R_SYM)(x)
 #define ELFW_DT_RELW DT_RELA
 #define ELFW_DT_RELWSZ DT_RELASZ
 
@@ -120,7 +124,17 @@ static int prot_from_phdr(const ElfW(Phdr) *phdr)
         prot |= PROT_WRITE;
     if (phdr->p_flags & PF_X)
         prot |= PROT_EXEC;
+    /*
+     * FIXME
+     * In ARM, some global variables in .text will appear in .rel.dyn,
+     * and we need to give it WRITE permission to relocate it.
+     * It must be fixed due to security issue !!!
+     */
+#if defined(__X86_64__)
     return prot;
+#else
+    return prot |= PROT_WRITE;
+#endif
 }
 
 static inline
@@ -172,7 +186,9 @@ asm(".pushsection .text,\"ax\",\"progbits\""  "\n"
     "plt_trampoline:"                         "\n"
     POP_S(REG_ARG_1) /* Argument 1 */         "\n"
     POP_S(REG_ARG_2) /* Argument 2 */         "\n"
+    PUSH_STACK_STATE                          "\n"
     CALL(system_plt_resolver)                 "\n"
+    POP_STACK_STATE                           "\n"
     JMP_REG(REG_RET)                          "\n"
     ".popsection"                             "\n");
 
@@ -232,7 +248,7 @@ dloader_p api_load(const char *filename)
         --last_load;
 
     /*
-     * Total memory size of phdr with PT_LOAD: Assume phdrs are continuous/
+     * Total memory size of phdr between first and last PT_LOAD.
      */
     size_t span = last_load->p_vaddr + last_load->p_memsz - first_load->p_vaddr;
     _debug("first_load: \t0x%" PRIxPTR "\n", (uintptr_t)first_load);
@@ -281,9 +297,13 @@ dloader_p api_load(const char *filename)
                 mprotect((void *) last_page_end,
                          start - last_page_end, PROT_NONE);
 
-            mmap((void *) start, end - start,
+            _debug("\nstart: \t\t0x%" PRIxPTR "\n", start);
+            _debug("end: \t\t0x%" PRIxPTR "\n", end);
+            uintptr_t __attribute__((unused)) ret =
+              (uintptr_t)mmap((void *) start, end - start,
                  prot_from_phdr(ph), MAP_PRIVATE | MAP_FIXED, fd,
                  round_down(ph->p_offset, pagesize));
+            _debug("ret: \t\t0x%" PRIxPTR "\n", ret);
 
             handle_bss(ph, load_bias, pagesize);
         }
@@ -303,7 +323,18 @@ dloader_p api_load(const char *filename)
         (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, ELFW_DT_RELW));
     size_t relocs_size = get_dynamic_entry(dynamic, ELFW_DT_RELWSZ);
 
-    _debug("relocs_size: \t0x%zx\n", relocs_size);
+    /*
+     * FIXME
+     * There is no RELA in ARM instead of REL,
+     * someone should make the condition code better.
+     */
+    if(relocs_size == 0) {
+      relocs =
+        (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, DT_REL));
+      relocs_size = get_dynamic_entry(dynamic, DT_RELSZ);
+    }
+    _debug("relocs: \t0x%" PRIxPTR"\n", (uintptr_t)relocs);
+    _debug("relocs_size: \t0x%zx\n", relocs_size/sizeof(ElfW_Reloc));
 
     for (i = 0; i < relocs_size / sizeof(ElfW_Reloc); i++) {
         ElfW_Reloc *reloc = &relocs[i];
@@ -312,15 +343,31 @@ dloader_p api_load(const char *filename)
         case R_X86_64_RELATIVE:
         {
             _debug("R_X86_64_RELATIVE\n");
+            _debug("\treloc offset: 0x%"PRIxPTR"\n", reloc->r_offset);
+
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
+
+            _debug("\taddr: 0x%"PRIxPTR"\n", (uintptr_t)addr);
+            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
+
             *addr += load_bias;
+
+            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
             break;
         }
         case R_ARM_RELATIVE:
         {
             _debug("R_ARM_RELATIVE\n");
+            _debug("\treloc offset: 0x%"PRIxPTR"\n", reloc->r_offset);
+
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
+
+            _debug("\taddr: 0x%"PRIxPTR"\n", (uintptr_t)addr);
+            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
+
             *addr += load_bias;
+
+            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
             break;
         }
         case R_AARCH64_RELATIVE:
