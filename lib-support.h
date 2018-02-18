@@ -6,7 +6,7 @@
 #define STR(...)  #__VA_ARGS__
 #define XSTR(...) STR(__VA_ARGS__)
 #define _ES_HASH  #
-#define ES_HASH() _ES_HASH()
+#define ES_HASH() _ES_HASH
 
 #if defined(__x86_64__)
 #define _PUSH_S(x)   pushq x
