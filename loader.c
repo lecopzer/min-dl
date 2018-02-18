@@ -26,12 +26,6 @@ typedef ElfW(Rel) ElfW_Reloc;
 #define ELFW_DT_RELW DT_RELA
 #define ELFW_DT_RELWSZ DT_RELASZ
 
-#ifdef DEBUG
-#define _debug(...) printf(__VA_ARGS__)
-#else
-#define _debug(...)
-#endif
-
 struct __DLoader_Internal {
     uintptr_t load_bias;
     void *entry;
@@ -251,9 +245,6 @@ dloader_p api_load(const char *filename)
      * Total memory size of phdr between first and last PT_LOAD.
      */
     size_t span = last_load->p_vaddr + last_load->p_memsz - first_load->p_vaddr;
-    _debug("first_load: \t0x%" PRIxPTR "\n", (uintptr_t)first_load);
-    _debug("last_load: \t0x%" PRIxPTR "\n", (uintptr_t)last_load);
-    _debug("span: \t\t0x%zx\n", span);
 
     /*
      * Map the first segment and reserve the space used for the rest and
@@ -264,14 +255,11 @@ dloader_p api_load(const char *filename)
                          span, prot_from_phdr(first_load), MAP_PRIVATE, fd,
                          round_down(first_load->p_offset, pagesize));
 
-    _debug("mapping: \t0x%" PRIxPTR "\n", mapping);
     /*
      * Mapping will not always equal to round_down(first_load->p_vaddr, pagesize).
      */
     const ElfW(Addr) load_bias =
         mapping - round_down(first_load->p_vaddr, pagesize);
-
-    _debug("load_bias: \t0x%" PRIxPTR "\n", load_bias);
 
     if (first_load->p_offset > ehdr.e_phoff ||
         first_load->p_filesz <
@@ -297,13 +285,9 @@ dloader_p api_load(const char *filename)
                 mprotect((void *) last_page_end,
                          start - last_page_end, PROT_NONE);
 
-            _debug("\nstart: \t\t0x%" PRIxPTR "\n", start);
-            _debug("end: \t\t0x%" PRIxPTR "\n", end);
-            uintptr_t __attribute__((unused)) ret =
-              (uintptr_t)mmap((void *) start, end - start,
-                 prot_from_phdr(ph), MAP_PRIVATE | MAP_FIXED, fd,
-                 round_down(ph->p_offset, pagesize));
-            _debug("ret: \t\t0x%" PRIxPTR "\n", ret);
+            mmap((void *) start, end - start,
+              prot_from_phdr(ph), MAP_PRIVATE | MAP_FIXED, fd,
+              round_down(ph->p_offset, pagesize));
 
             handle_bss(ph, load_bias, pagesize);
         }
@@ -333,8 +317,6 @@ dloader_p api_load(const char *filename)
         (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, DT_REL));
       relocs_size = get_dynamic_entry(dynamic, DT_RELSZ);
     }
-    _debug("relocs: \t0x%" PRIxPTR"\n", (uintptr_t)relocs);
-    _debug("relocs_size: \t0x%zx\n", relocs_size/sizeof(ElfW_Reloc));
 
     for (i = 0; i < relocs_size / sizeof(ElfW_Reloc); i++) {
         ElfW_Reloc *reloc = &relocs[i];
@@ -342,37 +324,18 @@ dloader_p api_load(const char *filename)
         switch (reloc_type) {
         case R_X86_64_RELATIVE:
         {
-            _debug("R_X86_64_RELATIVE\n");
-            _debug("\treloc offset: 0x%"PRIxPTR"\n", reloc->r_offset);
-
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
-
-            _debug("\taddr: 0x%"PRIxPTR"\n", (uintptr_t)addr);
-            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
-
             *addr += load_bias;
-
-            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
             break;
         }
         case R_ARM_RELATIVE:
         {
-            _debug("R_ARM_RELATIVE\n");
-            _debug("\treloc offset: 0x%"PRIxPTR"\n", reloc->r_offset);
-
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
-
-            _debug("\taddr: 0x%"PRIxPTR"\n", (uintptr_t)addr);
-            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
-
             *addr += load_bias;
-
-            _debug("\t*addr: 0x%"PRIxPTR"\n", (uintptr_t)*addr);
             break;
         }
         case R_AARCH64_RELATIVE:
         {
-            _debug("R_AARCH64_RELATIVE\n");
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
             *addr += load_bias;
             break;
