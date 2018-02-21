@@ -328,7 +328,7 @@ dloader_p api_load(const char *filename)
      * There is no RELA in ARM instead of REL,
      * someone should make the condition code better.
      */
-    if(relocs_size == 0) {
+    if (relocs_size == 0) {
       relocs =
         (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, DT_REL));
       relocs_size = get_dynamic_entry(dynamic, DT_RELSZ);
