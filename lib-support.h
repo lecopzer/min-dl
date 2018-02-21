@@ -61,9 +61,6 @@
 #define PUSH_STACK_STATE "push {r11, lr}"
 #define POP_STACK_STATE  "pop {r11, lr}"
 
-#elif defined(__aarch64__)
-#define _PUSH(x,y) stp x, y, [sp, #-16]!
-#define _CALL(x)   bl x
 #else
 #error "Unsupported architecture"
 #endif

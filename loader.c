@@ -10,7 +10,6 @@
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
-#include <inttypes.h>
 
 #include "lib-support.h"
 
@@ -209,7 +208,6 @@ dloader_p api_load(const char *filename)
     switch (ehdr.e_machine) {
     case EM_X86_64:
     case EM_ARM:
-    case EM_AARCH64:
         break;
     default:
         fail(filename, "ELF file has wrong architecture!  ",
@@ -329,12 +327,6 @@ dloader_p api_load(const char *filename)
             break;
         }
         case R_ARM_RELATIVE:
-        {
-            ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
-            *addr += load_bias;
-            break;
-        }
-        case R_AARCH64_RELATIVE:
         {
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
             *addr += load_bias;
