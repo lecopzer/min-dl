@@ -16,15 +16,8 @@
 
 #define MAX_PHNUM 12
 
-#if defined(__x86_64__)
-typedef ElfW(Rela) ElfW_Reloc;
-#else
-typedef ElfW(Rel) ElfW_Reloc;
-#endif
 #define ELFW_R_TYPE(x) ELFW(R_TYPE)(x)
 #define ELFW_R_SYM(x) ELFW(R_SYM)(x)
-#define ELFW_DT_RELW DT_RELA
-#define ELFW_DT_RELWSZ DT_RELASZ
 
 #ifdef DEBUG
 #define _debug(...) printf(__VA_ARGS__)
@@ -322,17 +315,6 @@ dloader_p api_load(const char *filename)
     ElfW_Reloc *relocs =
         (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, ELFW_DT_RELW));
     size_t relocs_size = get_dynamic_entry(dynamic, ELFW_DT_RELWSZ);
-
-    /*
-     * FIXME
-     * There is no RELA in ARM instead of REL,
-     * someone should make the condition code better.
-     */
-    if (relocs_size == 0) {
-      relocs =
-        (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, DT_REL));
-      relocs_size = get_dynamic_entry(dynamic, DT_RELSZ);
-    }
     _debug("relocs: \t0x%" PRIxPTR"\n", (uintptr_t)relocs);
     _debug("relocs_size: \t0x%zx\n", relocs_size/sizeof(ElfW_Reloc));
 
