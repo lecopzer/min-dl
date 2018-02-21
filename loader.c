@@ -277,8 +277,8 @@ dloader_p api_load(const char *filename)
                          start - last_page_end, PROT_NONE);
 
             mmap((void *) start, end - start,
-              prot_from_phdr(ph), MAP_PRIVATE | MAP_FIXED, fd,
-              round_down(ph->p_offset, pagesize));
+                 prot_from_phdr(ph), MAP_PRIVATE | MAP_FIXED, fd,
+                 round_down(ph->p_offset, pagesize));
 
             handle_bss(ph, load_bias, pagesize);
         }
