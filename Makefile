@@ -1,4 +1,5 @@
 CROSS_COMPILE_SUFFIX ?= -linux-gnueabi
+
 CC = $(CROSS_COMPILE)gcc
 CFLAGS  = -std=gnu99 -Wall -Werror -g -D_GNU_SOURCE
 CFLAGS += -DPROG_HEADER=prog_header
@@ -7,6 +8,7 @@ OUT = out
 
 ARCH = x86_64 arm
 CHECK_ARCH = $(addprefix check_, $(ARCH))
+CHECK_CC_ARCH = $(addprefix check_cc_, $(ARCH))
 BIN = $(OUT) $(OUT)/test_lib.so $(OUT)/loader
 all: $(BIN)
 
@@ -28,7 +30,13 @@ LOADER_OBJS = $(OUT)/loader.o $(OUT)/test_loader.o
 $(OUT)/loader: $(LOADER_OBJS)
 	$(CC) -o $@ $(LOADER_OBJS)
 
-$(ARCH):
+$(CHECK_CC_ARCH):
+	@echo "Check cross compiler exist or not"
+	@echo "CROSS_COMPILE_SUFFIX=$(CROSS_COMPILE_SUFFIX)"
+	@which $(patsubst check_cc_%,%,$@)$(CROSS_COMPILE_SUFFIX)-gcc
+	@echo "Pass"
+
+$(ARCH): % : check_cc_%
 	@make CROSS_COMPILE=$@$(CROSS_COMPILE_SUFFIX)- all
 
 $(CHECK_ARCH): check_% : %
