@@ -110,17 +110,7 @@ static int prot_from_phdr(const ElfW(Phdr) *phdr)
         prot |= PROT_WRITE;
     if (phdr->p_flags & PF_X)
         prot |= PROT_EXEC;
-    /*
-     * FIXME
-     * In ARM, some global variables in .text will appear in .rel.dyn,
-     * and we need to give it WRITE permission to relocate it.
-     * It must be fixed due to security issue !!!
-     */
-#if defined(__X86_64__)
     return prot;
-#else
-    return prot |= PROT_WRITE;
-#endif
 }
 
 static inline
@@ -262,6 +252,10 @@ dloader_p api_load(const char *filename)
         fail(filename, "First load segment of ELF does not contain phdrs!",
              NULL, 0);
 
+    const ElfW(Phdr) *ro_load = NULL;
+    if (!(first_load->p_flags & PF_W))
+        ro_load = first_load;
+
     handle_bss(first_load, load_bias, pagesize);
 
     ElfW(Addr) last_end = first_load->p_vaddr + load_bias +
@@ -285,6 +279,8 @@ dloader_p api_load(const char *filename)
                  round_down(ph->p_offset, pagesize));
 
             handle_bss(ph, load_bias, pagesize);
+            if (!(ph->p_flags & PF_W) && !ro_load)
+                ro_load = ph;
         }
     }
 
@@ -298,6 +294,9 @@ dloader_p api_load(const char *filename)
     }
     assert(dynamic != NULL);
 
+    ElfW(Addr) ro_start = ro_load->p_offset + load_bias;
+    ElfW(Addr) ro_end = ro_load->p_offset + load_bias +
+                        ro_load->p_memsz;
     ElfW_Reloc *relocs =
         (ElfW_Reloc *)(load_bias + get_dynamic_entry(dynamic, ELFW_DT_RELW));
     size_t relocs_size = get_dynamic_entry(dynamic, ELFW_DT_RELWSZ);
@@ -309,7 +308,16 @@ dloader_p api_load(const char *filename)
         case R_ARM_RELATIVE:
         {
             ElfW(Addr) *addr = (ElfW(Addr) *)(load_bias + reloc->r_offset);
-            *addr += load_bias;
+            if ((intptr_t) addr < ro_end && (intptr_t) addr >= ro_start)
+            {
+                mprotect((void*) round_down((intptr_t) addr, pagesize),
+                         pagesize, PROT_WRITE);
+                *addr += load_bias;
+                mprotect((void*) round_down((intptr_t) addr, pagesize),
+                         pagesize, prot_from_phdr(ro_load));
+            }
+            else
+                *addr += load_bias;
             break;
         }
         default:
