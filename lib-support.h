@@ -17,6 +17,11 @@
 #include "arch/x86_64.h"
 #elif defined(__arm__)
 #include "arch/arm.h"
+#elif defined(__aarch64__)
+#if __GNUC__ < 7
+#error GCC version should >= 7
+#endif
+#include "arch/aarch64.h"
 #else
 #error "Unsupported architecture"
 #endif

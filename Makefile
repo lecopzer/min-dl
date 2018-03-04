@@ -5,7 +5,7 @@ CFLAGS += -DPROG_HEADER=prog_header
 
 OUT = out
 
-ARCH = x86_64 arm
+ARCH = x86_64 arm aarch64
 CHECK_ARCH = $(addprefix check_, $(ARCH))
 CHECK_CC_ARCH = $(addprefix check_cc_, $(ARCH))
 BIN = $(OUT) $(OUT)/test_lib.so $(OUT)/loader
